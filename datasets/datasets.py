@@ -1,42 +1,79 @@
 import os
+import sys
+from typing import List, Dict, Tuple, Set, Union, Optional, Any, Callable
+
+from PIL import Image
 
 import numpy as np
 import torch
+from torch.utils.data import Dataset
 from torch.utils.data.dataset import Subset
 from torchvision import datasets, transforms
 
 from utils.utils import set_random_seed
 
-DATA_PATH = '~/data/'
-IMAGENET_PATH = '~/data/ImageNet'
+DATA_PATH = None #'~/data/'
+IMAGENET_PATH = None # '~/data/ImageNet'
 
 
-CIFAR10_SUPERCLASS = list(range(10))  # one class
-IMAGENET_SUPERCLASS = list(range(30))  # one class
+CIFAR10_SUPERCLASS = None # list(range(10))  # one class
+IMAGENET_SUPERCLASS = None # list(range(30))  # one class
 
-CIFAR100_SUPERCLASS = [
-    [4, 31, 55, 72, 95],
-    [1, 33, 67, 73, 91],
-    [54, 62, 70, 82, 92],
-    [9, 10, 16, 29, 61],
-    [0, 51, 53, 57, 83],
-    [22, 25, 40, 86, 87],
-    [5, 20, 26, 84, 94],
-    [6, 7, 14, 18, 24],
-    [3, 42, 43, 88, 97],
-    [12, 17, 38, 68, 76],
-    [23, 34, 49, 60, 71],
-    [15, 19, 21, 32, 39],
-    [35, 63, 64, 66, 75],
-    [27, 45, 77, 79, 99],
-    [2, 11, 36, 46, 98],
-    [28, 30, 44, 78, 93],
-    [37, 50, 65, 74, 80],
-    [47, 52, 56, 59, 96],
-    [8, 13, 48, 58, 90],
-    [41, 69, 81, 85, 89],
-]
+CIFAR100_SUPERCLASS = None 
+# [
+#     [4, 31, 55, 72, 95],
+#     [1, 33, 67, 73, 91],
+#     [54, 62, 70, 82, 92],
+#     [9, 10, 16, 29, 61],
+#     [0, 51, 53, 57, 83],
+#     [22, 25, 40, 86, 87],
+#     [5, 20, 26, 84, 94],
+#     [6, 7, 14, 18, 24],
+#     [3, 42, 43, 88, 97],
+#     [12, 17, 38, 68, 76],
+#     [23, 34, 49, 60, 71],
+#     [15, 19, 21, 32, 39],
+#     [35, 63, 64, 66, 75],
+#     [27, 45, 77, 79, 99],
+#     [2, 11, 36, 46, 98],
+#     [28, 30, 44, 78, 93],
+#     [37, 50, 65, 74, 80],
+#     [47, 52, 56, 59, 96],
+#     [8, 13, 48, 58, 90],
+#     [41, 69, 81, 85, 89],
+# ]
 
+class OccDataset(Dataset):
+
+    def __init__(self,
+                    data_list: list,
+                    mode: str,
+                    transform) -> None:
+
+        self.mode = mode
+        self.data_list = data_list
+        self.transform = transform
+
+        if mode == 'train':
+            self.targets = [0 for _ in len(data_list)]
+                
+        elif mode == 'test':
+            self.tragets = [1 for _ in len(data_list)]
+
+    def __len__(self) -> int:
+
+        return len(self.data_list)
+
+    def __getitem__(self,
+                    idx: int) -> Tuple[torch.Tensor, int]:
+
+        filename, label = self.data_list[idx].split()
+
+        img = Image.open(filename)
+        img = img.convert('RGB') # RGBA appears sometimes...
+        img = self.transform(img)
+
+        return img
 
 class MultiDataTransform(object):
     def __init__(self, transform):
@@ -168,7 +205,7 @@ def get_dataset(P, dataset, test_only=False, image_size=None, download=False, ev
         assert test_only and image_size is not None
         test_dir = os.path.join(DATA_PATH, 'Imagenet_fix')
         test_set = datasets.ImageFolder(test_dir, transform=test_transform)
-
+   
     elif dataset == 'imagenet':
         image_size = (224, 224, 3)
         n_classes = 30
@@ -226,7 +263,20 @@ def get_dataset(P, dataset, test_only=False, image_size=None, download=False, ev
         test_set = get_subset_with_len(test_set, length=3000, shuffle=True)
 
     else:
-        raise NotImplementedError()
+            
+        fn = f'occ_train.txt'
+
+        with open(os.path.join(P.data_dir, fn), 'r') as fs:
+            data_list = np.array([fn.strip() for fn in fs.readlines() if len(fn) > 3])
+
+        train_set = OccDataset(data_list, 'train', train_transform)
+
+        fn = f'occ_test.txt'
+
+        with open(os.path.join(P.data_dir, fn), 'r') as fs:
+            data_list = np.array([fn.strip() for fn in fs.readlines() if len(fn) > 3])
+
+        test_set = OccDataset(data_list, 'test', train_transform)
 
     if test_only:
         return test_set
@@ -242,7 +292,8 @@ def get_superclass_list(dataset):
     elif dataset == 'imagenet':
         return IMAGENET_SUPERCLASS
     else:
-        raise NotImplementedError()
+        return [0, 1]
+        # raise NotImplementedError()
 
 
 def get_subclass_dataset(dataset, classes):
