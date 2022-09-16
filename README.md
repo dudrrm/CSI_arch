@@ -14,6 +14,17 @@ and [Jinwoo Shin](http://alinlab.kaist.ac.kr/shin.html).
 
 ## 1. Requirements
 ### Environments
+
+```
+conda create -n csi python=3.8
+conda activate sci
+conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch-lts -c nvidia
+conda install -c anaconda scikit-learn tensorboard
+pip install torchlars diffdist
+pip install git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git
+conda install -c conda-forge nvidia-apex
+```
+
 Currently, requires following packages
 - python 3.6+
 - torch 1.4+
